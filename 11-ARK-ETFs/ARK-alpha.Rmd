@@ -1,9 +1,9 @@
 ---
-title: "Correlation of ESG Excess Returns"
+title: "Does ARK (still) Generate Alpha?"
 author: "Martin Geissmann"
 date: "`r format(Sys.Date(), '%d %b %Y')`"
 output: pdf_document
-abstract: "Following the research by Botte et al. (2021), see https://www.twosigma.com/wp-content/uploads/2021/05/What-is-ESG_-Depends-on-Whom-You-Ask_-final.pdf, we look at the excess returns of ESG themed ETFs over their non-ESG benchmarks. We confirm that correlations are low or even negative, which indicates that there is no universal consent on what is a *good* ESG stock. As we look at several markets (USA, Emerging Markets, EAFE) where correlations are low also."
+abstract: "Ark Investment has become the largest actively managed ETF provider with innovation/technology-themed funds that delivered great performance. The question one should always ask is if putting your money in any fund will deliver exceptional returns (alpha). We find that all ARK funds delivered a mix of alpha and beta. Above average beta was responsible for the exceptional returns over the past years."
 ---
 
 ```{r init, include=FALSE, echo = F, message=F, warning=F}
@@ -13,10 +13,8 @@ options(knitr.kable.NA = "")
 
 ```{r}
 library(tidyverse)
-library(tidyquant)
-library(scales)
-library(kableExtra)
-library(RcppRoll)
+library(tiqyquant)
+library(lubridate)
 ```
 
 ```{r}
