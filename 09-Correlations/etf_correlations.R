@@ -42,11 +42,9 @@ return_cor <- returns_wide %>%
   select(-date) %>% 
   cor()
 
-return_cor
+# return_cor
 
-ggcorrplot(return_cor, type = "upper",
-           lab = TRUE)
-
+ggcorrplot(return_cor, type = "upper", lab = T)
 
 # but correlations are not constant over time!
 
@@ -61,6 +59,8 @@ rolling_correlation <- returns_wide %>%
                   col_rename = "rolling_correlation")
 
 rolling_correlation %>% 
+  filter(name %in% c("IJR", "GLD")) %>%
+  # filter(name %in% c("RWR", "TLT")) %>%
   ggplot(aes(x = date, y = rolling_correlation, color = name)) +
   geom_line() +
   labs(x = "", y = "", color = "") +

@@ -1,3 +1,5 @@
+# Portfolio DIVERSIFICATION
+
 # How diversification works? 
 # Why is the portfolio return is the average of the components' returns,
 # but the risk is always below the average risk of the components.
@@ -77,10 +79,15 @@ spy_gld_portfolio %>%
   mutate_at(vars(starts_with("annual")), percent)
 
 spy_gld_portfolio %>% 
+  filter(name != "portfolio1") %>% 
   stocks_chart()
 
 # why? the correlation plays a role 
 # https://www.google.com/search?q=portfolio+variance&source=lnms&tbm=isch
+
+portfolios %>% 
+  select(SPY, GLD) %>% 
+  cor()
 
 # portfolio 2
 spy_gld_agg_portfolio <- portfolios_long %>% 
@@ -94,8 +101,8 @@ spy_gld_agg_portfolio %>%
   mutate_at(vars(starts_with("annual")), percent)
 
 spy_gld_agg_portfolio %>% 
+  filter(name != "portfolio2") %>%
   stocks_chart()
-
 
 # portfolio 3
 spy_gld_agg_eem_portfolio <- portfolios_long %>% 
@@ -111,6 +118,8 @@ spy_gld_agg_eem_portfolio %>%
 spy_gld_agg_eem_portfolio %>% 
   stocks_chart()
 
+
+
 portfolios_long %>% 
   filter(str_detect(name, "SPY|portfolio")) %>% 
   group_by(name) %>% 
@@ -124,5 +133,7 @@ portfolios_long %>%
   scale_y_continuous(labels = percent) +
   theme_classic()
 
-# optimize? Markowitz
+# optimize? Markowitz & Modern Portfolio Theory
+
+# One hitch to remember: Correlations are not constant over time.
 
