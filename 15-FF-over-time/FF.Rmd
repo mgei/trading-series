@@ -1,0 +1,309 @@
+---
+title: "How bad did the Fama French Factors perform in the past decade?"
+author: "Martin Geissmann"
+date: "`r format(Sys.Date(), '%d %b %Y')`"
+output: pdf_document
+abstract: "Value was beaten by Growth. The Small Cap premium vanished in a decade where big tech won. But how bad has it actually been? And what's the picture outside of the US?"
+---
+
+# Data source
+
+https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+
+The factors are abbreviated as follows: *Mkt-RF*: Market excess return, *SMB*: Small-Minus-Big (Size), *HML*: High-Minus-Low (Book-to-Market Value), *RMW*: Robust-Minus-Weak (Profitability), *CMA*: Conservative-Minus-Aggressive (Investment), *WML*: Winners-Minus-Losers (Momentum)
+
+```{r init, include=FALSE, echo = F, message=F, warning=F}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+options(knitr.kable.NA = "")
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(scales)
+```
+
+```{r}
+ff_5 <- read_csv("data/F-F_Research_Data_5_Factors_2x3.csv", skip = 3,
+                 na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(ff_5$date)))
+
+ff_5 <- ff_5 %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date)
+
+
+ff_mom <- read_csv("data/F-F_Momentum_Factor.CSV", skip = 13,
+                   na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(ff_mom$date)))
+
+ff_mom <- ff_mom %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date) %>% 
+  filter(date >= min(ff_5$date))
+
+ff_5_mom <- bind_rows(ff_5,
+                      ff_mom) %>% 
+  mutate(series = if_else(series == "Mom", "WML", series))
+```
+
+```{r}
+europe_5 <- read_csv("data/Europe_5_Factors.csv", skip = 6,
+                     na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(europe_5$date)))
+
+europe_5 <- europe_5 %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date)
+
+
+europe_mom <- read_csv("data/Europe_MOM_Factor.csv", skip = 6,
+                   na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(europe_mom$date)))
+
+europe_mom <- europe_mom %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date) %>% 
+  filter(date >= min(ff_5$date))
+
+europe_5_mom <- bind_rows(europe_5,
+                      europe_mom)
+```
+
+```{r}
+japan_5 <- read_csv("data/Japan_5_Factors.csv", skip = 6,
+                    na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(japan_5$date)))
+
+japan_5 <- japan_5 %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date)
+
+
+japan_mom <- read_csv("data/Japan_MOM_Factor.csv", skip = 6,
+                   na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(japan_mom$date)))
+
+japan_mom <- japan_mom %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date) %>% 
+  filter(date >= min(ff_5$date))
+
+japan_5_mom <- bind_rows(japan_5,
+                          japan_mom)
+```
+
+```{r}
+asiapacific_5 <- read_csv("data/Asia_Pacific_ex_Japan_5_Factors.csv", skip = 6,
+                    na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(asiapacific_5$date)))
+
+asiapacific_5 <- asiapacific_5 %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date)
+
+
+asiapacific_mom <- read_csv("data/Asia_Pacific_ex_Japan_MOM_Factor.csv", skip = 6,
+                   na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(asiapacific_mom$date)))
+
+asiapacific_mom <- asiapacific_mom %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date) %>% 
+  filter(date >= min(ff_5$date))
+
+asiapacific_5_mom <- bind_rows(asiapacific_5,
+                          asiapacific_mom)
+```
+
+```{r}
+emerging_5 <- read_csv("data/Emerging_5_Factors.csv", skip = 6,
+                    na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(emerging_5$date)))
+
+emerging_5 <- emerging_5 %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date)
+
+
+emerging_mom <- read_csv("data/Emerging_MOM_Factor.csv", skip = 6,
+                   na = c("", "NA", "-99.99", "-999")) %>% 
+  mutate(date = ymd(paste0(X1, "01")))
+
+last_row <- min(which(is.na(emerging_mom$date)))
+
+emerging_mom <- emerging_mom %>% 
+  filter(row_number() < last_row) %>% 
+  select(-X1) %>% 
+  pivot_longer(-date, names_to = "series", values_to = "r") %>% 
+  mutate(r = as.double(r)/100) %>% 
+  arrange(series, date) %>% 
+  filter(date >= min(ff_5$date))
+
+emerging_5_mom <- bind_rows(emerging_5,
+                          emerging_mom)
+```
+
+# Standard Fama French Factors
+
+```{r}
+df <- ff_5_mom %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(from, " - ", to)) %>% 
+  filter(n() > 8*12) %>% 
+  filter(!(series %in% c("RF", "Mkt-RF")))
+
+df %>% 
+  ggplot(aes(x = date, y = p, color = series)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  labs(x = "", y = "", color = "",
+       title = "Fama French Factors (Standard)") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  facet_wrap(~from_to, scales = "free_x")
+```
+
+# Europe Fama French Factors
+
+```{r}
+df <- europe_5_mom %>% 
+  filter(!is.na(r)) %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+  filter(n() > 8*12) %>% 
+  filter(!(series %in% c("RF", "Mkt-RF")))
+
+df %>% 
+  ggplot(aes(x = date, y = p, color = series)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  labs(x = "", y = "", color = "",
+       title = "Fama French Factors (Europe)") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  facet_wrap(~from_to, scales = "free_x")
+```
+
+# Japan Fama French Factors
+
+```{r}
+df <- japan_5_mom %>% 
+  filter(!is.na(r)) %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+  filter(n() > 8*12) %>% 
+  filter(!(series %in% c("RF", "Mkt-RF")))
+
+df %>% 
+  ggplot(aes(x = date, y = p, color = series)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  labs(x = "", y = "", color = "",
+       title = "Fama French Factors (Japan)") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  facet_wrap(~from_to, scales = "free_x")
+```
+
+# Asia Pacific ex Japan Fama French Factors
+
+```{r}
+df <- asiapacific_5_mom %>% 
+  filter(!is.na(r)) %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+  filter(n() > 8*12) %>% 
+  filter(!(series %in% c("RF", "Mkt-RF")))
+
+df %>% 
+  ggplot(aes(x = date, y = p, color = series)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  labs(x = "", y = "", color = "",
+       title = "Fama French Factors (Asia Pacific ex Japan)") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  facet_wrap(~from_to, scales = "free_x")
+```
+
+# Emerging Markets Fama French Factors
+
+```{r}
+df <- asiapacific_5_mom %>% 
+  filter(!is.na(r)) %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+  filter(n() > 8*12) %>% 
+  filter(!(series %in% c("RF", "Mkt-RF")))
+
+df %>% 
+  ggplot(aes(x = date, y = p, color = series)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  labs(x = "", y = "", color = "",
+       title = "Fama French Factors (Emerging Markets)") +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  facet_wrap(~from_to, scales = "free_x")
+```
