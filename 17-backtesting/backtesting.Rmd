@@ -1,0 +1,225 @@
+---
+title: "Backtesting Trading Strategies in R"
+author: "Martin Geissmann"
+date: "`r Sys.setlocale('LC_TIME', 'en_US.UTF-8'); format(Sys.Date(), '%d %b %Y')`"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+    number_sections: true
+# abstract: ""
+---
+
+```{r, include=F}
+library(knitr)
+library(kableExtra)
+
+library(tidyverse)
+```
+
+# Introduction
+
+**Backtesting is simulating a systematic trading strategy on past data.**
+
+For example:
+
+* Always invest in equal amounts in SPY, QQQ, and TLT. Rebalance annually.
+* Invest in IWM if above 200-day moving average, otherwise AGG.
+* Invest in the tangency portfolio (Markowitz' model) using all S&P 500 stocks.
+* Invest in the 10 stocks with the highest retail trading volume (alternative data)
+
+In general, a backtest is the result of two steps:
+
+1. Signal \rightarrow Theoretical portfolio weights
+2. Theoretical portfolio weights \rightarrow Actual weights and portfolio return 
+
+The second step is subject to assumptions, e.g. the rebalance frequency, fees, slippage etc.
+
+What are our options for backtesting trading strategies in R?
+
+* "Basic" R (xts or tibble/dplyr)
+* Easy backtesting functions/packages
+* Accounting backtesting packages
+
+## How to find R packages
+
+Packages by name: https://cran.r-project.org/web/packages/available_packages_by_name.html
+
+Search for packages using `packagefinder::findPackage`
+
+```{r, eval = F}
+library(packagefinder)
+
+findPackage("backtest")
+```
+
+## Packages
+
+```{r, echo=F}
+comp <- readxl::read_excel("package-comparison.xlsx")
+
+comp %>% 
+  select(-link) %>% 
+  mutate(url = "link") %>% 
+  kable(caption = "Packages",
+        booktabs = T, 
+        linesep = "") %>% 
+  kable_styling(latex_options = c("hold_position", "striped", "scale_down")) %>% 
+  column_spec(1, width = "7em") %>% 
+  column_spec(2, width = "40em") %>% 
+  column_spec(3, width = "3em", link = comp$link)
+```
+
+# dplyr
+
+## SMA Rotation Strategy (Risk On/Off)
+
+*Rule*: If the S&P 500 is trading above its 200-days SMA, then invest in stocks. If it's below, then rotate into gold.
+
+```{r, message=F, eval = F}
+library(tidyverse)
+library(lubridate)
+library(tidyquant)
+library(RcppRoll)
+library(scales)
+```
+
+Get data.
+
+```{r, eval = F}
+spy <- tq_get("SPY", from = as.Date("2005-01-01"))
+gld <- tq_get("GLD", from = as.Date("2005-01-01"))
+```
+
+```{r, eval = F}
+spy_gld <- full_join(spy %>% 
+                       select(date, spy.cl = close, spy.adj = adjusted),
+                     gld %>% 
+                       select(date, gld.adj = adjusted),
+                     by = "date") %>% 
+  arrange(date) %>% 
+  mutate(spy.r = spy.adj/lag(spy.adj)-1,
+         gld.r = gld.adj/lag(gld.adj)-1)
+```
+
+```{r, eval = F}
+strategy <- spy_gld %>% 
+  mutate(SMA = roll_mean(spy.cl, n = 200, align = "right", fill = NA_real_),
+         SMA_signal = lag(spy.cl >= SMA)) %>% 
+  filter(!is.na(SMA_signal)) %>% 
+  mutate(strategy.r = ifelse(SMA_signal, spy.r, gld.r))
+```
+
+```{r, eval = F}
+strategy_long <- strategy %>% 
+  select(date, spy.r, gld.r, strategy.r) %>% 
+  pivot_longer(-date, values_to = "r") %>% 
+  arrange(name, date) %>% 
+  group_by(name) %>% 
+  # cumulative performance
+  mutate(p = cumprod(1+r)-1) %>% 
+  group_by(series = str_to_upper(str_remove(name, ".r$")))
+```
+
+```{r, eval = F}
+strategy_long %>% 
+  ggplot(aes(x = date, y = p, color = series)) +
+  geom_line() +
+  scale_color_brewer(type = "qual", palette = 3) +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_labels = "%b %y") +
+  labs(x = "", y = "", color = "") +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+```{r, eval = F}
+strategy_long %>% 
+  # annualized performance (PerformanceAnalytics, tidyquant)
+  tq_performance(Ra = r, performance_fun = table.AnnualizedReturns, scale = 252)
+```
+
+```{r, eval = F}
+strategy_long %>% 
+  # calculate drawdowns
+  mutate(dd = (1+p)/cummax(1+p)-1) %>% 
+  ggplot(aes(x = date, y = dd, color = series)) +
+  geom_line() +
+  scale_color_brewer(type = "qual", palette = 3) +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_labels = "%b %y") +
+  labs(x = "", y = "", color = "") +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+# portfolioBacktest
+
+- requires xts data
+- ideal of testing on several subsamples of data at once
+
+```{r, eval = F}
+library(portfolioBacktest)
+
+data("dataset10")
+
+dataset10$`dataset 1`$adjusted
+
+# defining the portfolio (equal weighting)
+my_portfolio <- function(dataset, ...) {
+  prices <- dataset$adjusted
+  print(nrow(prices))
+  N <- ncol(prices)
+  return(rep(1/N, N))
+}
+
+bt <- portfolioBacktest(my_portfolio, list(dataset10$`dataset 1`))
+
+backtestSummary(bt)$performance
+
+my_portfolio_sma <- function(dataset, ...) {
+  prices <- dataset$adjusted
+  print(prices)
+  
+    N <- ncol(prices)
+  return(rep(1/N, N))
+}
+
+bt <- portfolioBacktest(portfolio_funs = my_portfolio_sma(), dataset_list = dataset10)
+
+```
+
+# AssetAllocation
+
+```{r, eval = F}
+library(AssetAllocation)
+library(PerformanceAnalytics)
+names(basic_asset_alloc)
+```
+
+```{r, eval = F}
+basic_asset_alloc$all_weather
+
+ivy_port_weights()
+```
+
+```{r, eval = F}
+## Example 1: backtesting one of the asset allocations in the package
+strat_permanent <- basic_asset_alloc$permanent
+strat_fancy <- list(name = "Fancy",
+                    tickers = c("SPY", "TLT"),
+                    default_weights = c(1, 0),
+                    rebalance_frequency = "month",
+                    portfolio_rule_fn)
+
+# test using the data set provided in the package
+bt_strat_permanent <- backtest_allocation(strat_permanent, ETFs_daily)
+
+# plot cumulative returns
+chart.CumReturns(bt_strat_permanent$returns,
+                 main = paste0("Cumulative returns of the ",
+                               bt_strat_permanent$strat$name,
+                               " portfolio"),
+                 ylab = "Cumulative returns")
+```
+
+Only supports constant weights for now.

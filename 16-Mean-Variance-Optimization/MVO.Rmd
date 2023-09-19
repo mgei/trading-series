@@ -1,0 +1,123 @@
+---
+title: "Mean Variance Optimization"
+author: "Martin Geissmann"
+date: "`r Sys.setlocale('LC_TIME', 'en_US.UTF-8'); format(Sys.Date(), '%d %b %Y')`"
+output: 
+  pdf_document:
+    number_sections: true
+# abstract: ""
+---
+
+# Introduction
+
+Given a number of assets, how can we form a portfolio that gives the highest return for the least amount of risk?
+
+Terms:
+
+* **feasible portfolios**:
+    * Any allocation that can be obtained with any asset weights. Asset weights should sum up to 1.
+    
+* **efficient portfolios** (and efficient frontier): 
+    * Any portfolio that comes with the least amount of risk for a given return.
+    
+* **minimum variance portfolio**  (MVP): 
+    * The portfolio that has the smallest possible risk of all portfolios.
+    
+* **tangency portfolio**: 
+    * The portfolio with the greatest return-to-risk ratio.
+
+Constraints:
+
+* allow short-selling
+    * closed form solution available
+* disallow short-selling (individual weights must be between 0 and 1)
+    * needs optimization (quadratic programming)
+    
+Find the efficient frontier:
+
+* Lagrangian approach (when we allow short-selling)
+* use an R package like fPortfolio, tseries, or PortfolioAnalytics
+* quadratic programming in R (quadprog package)
+
+Note: **In case that we do not restrict short-selling, there is a closed-form solution. Without short-selling quadratic programming is needed.**
+
+# Data
+
+```{r, echo = F, message=F, warning=F}
+knitr::opts_chunk$set(echo = T, message = F, warning = F)
+```
+
+```{r}
+library(tidyverse)
+library(tidyquant)
+```
+
+```{r, eval = F}
+# data
+funds <- "XLE	Energy Select Sector SPDR Fund
+          XLF	Financial Select Sector SPDR Fund
+          XLU	Utilities Select Sector SPDR Fund
+          XLI	Industrial Select Sector SPDR Fund
+          XLK	Technology Select Sector SPDR Fund
+          XLV	Health Care Select Sector SPDR Fund
+          XLY	Consumer Discretionary Select Sector SPDR Fund
+          XLP	Consumer Staples Select Sector SPDR Fund
+          XLB	Materials Select Sector SPDR Fund
+          XOP	Spdr S&P Oil & Gas Exploration & Production Etf
+          XHB	Spdr S&P Homebuilders Etf
+          XRT	Spdr S&P Retail Etf"
+
+funds_tbl <- tibble(funds = read_lines(funds)) %>% 
+  mutate(funds = str_trim(funds)) %>% 
+  separate(funds, into = c("ticker", "name"), sep = "\t") %>% 
+  mutate_all(str_trim)
+
+prices <- tq_get(funds_tbl$ticker, from = as.Date("2010-01-01"))
+
+monthly_rets <- prices %>% 
+  group_by(symbol, m = floor_date(date, "months")) %>% 
+  filter(date == min(date, na.rm = T)) %>% 
+  group_by(symbol) %>% 
+  mutate(date = floor_date(date, "months"),
+         r = log(adjusted/lag(adjusted))) %>% 
+  ungroup() %>% 
+  select(symbol, date, r) %>% 
+  pivot_wider(names_from = symbol, values_from = r) %>%
+  arrange(date) %>% 
+  filter_all(all_vars(!is.na(.)))
+
+monthly_rets %>% saveRDS("data/monthly_rets.RDS")
+```
+
+```{r}
+# log returns
+monthly_rets <- readRDS("data/monthly_rets.RDS")
+
+library(timeSeries)
+
+monthly_rets_ts <- column_to_rownames(monthly_rets, "date") %>% 
+  as.timeSeries()
+```
+
+```{r}
+library(fPortfolio)
+
+monthly_rets_ts %>% 
+  assetsCorImagePlot()
+```
+
+# Random portfolios
+
+```{r}
+mu_hat <- colMeans(monthly_rets_ts)*12
+
+w <- rep(1, ncol(monthly_rets_ts))/ncol(monthly_rets_ts)
+
+t(w) %*% mu_hat
+```
+
+
+
+```{r}
+
+```

@@ -1,6 +1,23 @@
 # -*- coding: iso-8859-1 -*-
 
+
+def ZoomToFit2(size=[1,1], dest=None, force_int=False):
+    #if not dest:
+    #    dest = (1024 + 3, 768 + 3)
+    #newx = dest[0]
+    #newy = size[1] * newx / size[0]
+    #if newy > dest[1]:
+    #    newy = dest[1]
+    #    newx = size[0] * newy / size[1]
+    #if force_int:
+    #    return (int(newx), int(newy))
+    #return (newx, newy)
+
 PageProps = {
+  1: {
+       'keys': { 'j': ZoomToFit2() },
+       'boxes': [(0.48802083333333335, 0.4861111111111111, 0.6484375, 0.5555555555555556)]
+     },
   2: {
        'boxes': [(0.49192708333333335, 0.45416666666666666, 0.65234375, 0.5097222222222222), (0.3026041666666667, 0.5231481481481481, 0.484375, 0.6111111111111112)]
      }

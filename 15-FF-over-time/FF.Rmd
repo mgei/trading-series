@@ -2,7 +2,9 @@
 title: "How bad did the Fama French Factors perform in the past decade?"
 author: "Martin Geissmann"
 date: "`r format(Sys.Date(), '%d %b %Y')`"
-output: pdf_document
+output: 
+  pdf_document:
+    number_sections: true
 abstract: "Value was beaten by Growth. The Small Cap premium vanished in a decade where big tech won. But how bad has it actually been? And what's the picture outside of the US?"
 ---
 
@@ -189,30 +191,48 @@ emerging_5_mom <- bind_rows(emerging_5,
                           emerging_mom)
 ```
 
-# Standard Fama French Factors
+# Performance over time
 
-```{r}
+The performance of the FF factors was poor over the past decade 2010 - 2019. We observed similarly poor performances in the 1990s. In both of these decades we had strong stock market returns.
+
+The pattern is especially observable in the Standard FF factors which include US stock (NYSE, AMEX, and NASDAQ).
+
+The factors are abbreviated as follows:
+
+* *Mkt-RF*: Market excess return
+* *SMB*: Small-Minus-Big (Size)
+* *HML*: High-Minus-Low (Book-to-Market Value)
+* *RMW*: Robust-Minus-Weak (Profitability) 
+* *CMA*: Conservative-Minus-Aggressive (Investment)
+* *WML*: Winners-Minus-Losers (Momentum)
+
+## Standard Fama French Factors
+
+```{r, fig.height=9}
 df <- ff_5_mom %>% 
   group_by(decade = floor_date(date, "10 years"), series) %>% 
   mutate(from = min(date), to = max(date),
          p = cumprod(1+r)-1,
-         from_to = paste0(from, " - ", to)) %>% 
-  filter(n() > 8*12) %>% 
-  filter(!(series %in% c("RF", "Mkt-RF")))
+         from_to = paste0(from, " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
+  filter(n() > 8*12 | dec == "2020s") %>% 
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
 
 df %>% 
   ggplot(aes(x = date, y = p, color = series)) +
   geom_line() +
   scale_y_continuous(labels = percent) +
   scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  scale_color_manual(values = c("black", RColorBrewer::brewer.pal(name = "Set3", n = 10))) +
   labs(x = "", y = "", color = "",
        title = "Fama French Factors (Standard)") +
   theme_minimal() +
   theme(legend.position = "top") +
-  facet_wrap(~from_to, scales = "free_x")
+  facet_wrap(~dec, scales = "free_x")
 ```
 
-# Europe Fama French Factors
+## Europe Fama French Factors
 
 ```{r}
 df <- europe_5_mom %>% 
@@ -220,23 +240,26 @@ df <- europe_5_mom %>%
   group_by(decade = floor_date(date, "10 years"), series) %>% 
   mutate(from = min(date), to = max(date),
          p = cumprod(1+r)-1,
-         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+         from_to = paste0(floor_date(from, "year"), " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
   filter(n() > 8*12) %>% 
-  filter(!(series %in% c("RF", "Mkt-RF")))
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
 
 df %>% 
   ggplot(aes(x = date, y = p, color = series)) +
   geom_line() +
   scale_y_continuous(labels = percent) +
   scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  scale_color_manual(values = c("black", RColorBrewer::brewer.pal(name = "Set3", n = 10))) +
   labs(x = "", y = "", color = "",
        title = "Fama French Factors (Europe)") +
   theme_minimal() +
   theme(legend.position = "top") +
-  facet_wrap(~from_to, scales = "free_x")
+  facet_wrap(~dec, scales = "free_x")
 ```
 
-# Japan Fama French Factors
+## Japan Fama French Factors
 
 ```{r}
 df <- japan_5_mom %>% 
@@ -244,23 +267,26 @@ df <- japan_5_mom %>%
   group_by(decade = floor_date(date, "10 years"), series) %>% 
   mutate(from = min(date), to = max(date),
          p = cumprod(1+r)-1,
-         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+         from_to = paste0(floor_date(from, "year"), " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
   filter(n() > 8*12) %>% 
-  filter(!(series %in% c("RF", "Mkt-RF")))
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
 
 df %>% 
   ggplot(aes(x = date, y = p, color = series)) +
   geom_line() +
   scale_y_continuous(labels = percent) +
   scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  scale_color_manual(values = c("black", RColorBrewer::brewer.pal(name = "Set3", n = 10))) +
   labs(x = "", y = "", color = "",
        title = "Fama French Factors (Japan)") +
   theme_minimal() +
   theme(legend.position = "top") +
-  facet_wrap(~from_to, scales = "free_x")
+  facet_wrap(~dec, scales = "free_x")
 ```
 
-# Asia Pacific ex Japan Fama French Factors
+## Asia Pacific ex Japan Fama French Factors
 
 ```{r}
 df <- asiapacific_5_mom %>% 
@@ -268,42 +294,195 @@ df <- asiapacific_5_mom %>%
   group_by(decade = floor_date(date, "10 years"), series) %>% 
   mutate(from = min(date), to = max(date),
          p = cumprod(1+r)-1,
-         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+         from_to = paste0(floor_date(from, "year"), " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
   filter(n() > 8*12) %>% 
-  filter(!(series %in% c("RF", "Mkt-RF")))
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
 
 df %>% 
   ggplot(aes(x = date, y = p, color = series)) +
   geom_line() +
   scale_y_continuous(labels = percent) +
   scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  scale_color_manual(values = c("black", RColorBrewer::brewer.pal(name = "Set3", n = 10))) +
   labs(x = "", y = "", color = "",
        title = "Fama French Factors (Asia Pacific ex Japan)") +
   theme_minimal() +
   theme(legend.position = "top") +
-  facet_wrap(~from_to, scales = "free_x")
+  facet_wrap(~dec, scales = "free_x")
 ```
 
-# Emerging Markets Fama French Factors
+## Emerging Markets Fama French Factors
 
-```{r}
-df <- asiapacific_5_mom %>% 
+```{r, fig.height=9}
+df <- emerging_5_mom %>% 
   filter(!is.na(r)) %>% 
   group_by(decade = floor_date(date, "10 years"), series) %>% 
   mutate(from = min(date), to = max(date),
          p = cumprod(1+r)-1,
-         from_to = paste0(floor_date(from, "year"), " - ", to)) %>% 
+         from_to = paste0(floor_date(from, "year"), " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
   filter(n() > 8*12) %>% 
-  filter(!(series %in% c("RF", "Mkt-RF")))
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
 
 df %>% 
   ggplot(aes(x = date, y = p, color = series)) +
   geom_line() +
   scale_y_continuous(labels = percent) +
   scale_x_date(date_breaks = "2 years", date_labels = "%y") +
+  scale_color_manual(values = c("black", RColorBrewer::brewer.pal(name = "Set3", n = 10))) +
   labs(x = "", y = "", color = "",
        title = "Fama French Factors (Emerging Markets)") +
   theme_minimal() +
   theme(legend.position = "top") +
-  facet_wrap(~from_to, scales = "free_x")
+  facet_wrap(~dec, scales = "free_x")
 ```
+
+# Correlations
+
+## Standard Fama French Factors
+
+```{r}
+df <- ff_5_mom %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(from, " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
+  filter(n() > 8*12) %>% 
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
+
+df_cor <- df %>% 
+  ungroup() %>% 
+  select(date, series, r) %>% 
+  pivot_wider(names_from = series, values_from = r) %>% 
+  select(-date) %>%
+  select(`_Mkt-RF`, everything()) %>% 
+  cor()
+
+df_cor %>% 
+  corrplot::corrplot(diag = T, type = "lower", method = "color", addCoef.col = "black",
+                     tl.cex=0.9, 
+                     title = "Correlations of Standard Monthly FF-Factors 1970 - 2021",
+                     mar = c(2, 0, 1, 0))
+```
+
+## Europe Fama French Factors
+
+```{r}
+df <- europe_5_mom %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(from, " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
+  filter(n() > 8*12) %>% 
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
+
+df_cor <- df %>% 
+  ungroup() %>% 
+  select(date, series, r) %>% 
+  pivot_wider(names_from = series, values_from = r) %>% 
+  select(-date) %>%
+  select(`_Mkt-RF`, everything()) %>% 
+  filter(!is.na(WML)) %>% 
+  cor()
+
+df_cor %>% 
+  corrplot::corrplot(diag = T, type = "lower", method = "color", addCoef.col = "black",
+                     tl.cex=0.9, 
+                     title = "Correlations of European Monthly FF-Factors 1990 - 2021",
+                     mar = c(2, 0, 1, 0))
+```
+
+## Japan Fama French Factors
+
+```{r}
+df <- japan_5_mom %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(from, " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
+  filter(n() > 8*12) %>% 
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
+
+df_cor <- df %>% 
+  ungroup() %>% 
+  select(date, series, r) %>% 
+  pivot_wider(names_from = series, values_from = r) %>% 
+  select(-date) %>%
+  select(`_Mkt-RF`, everything()) %>% 
+  filter(!is.na(WML)) %>% 
+  cor()
+
+df_cor %>% 
+  corrplot::corrplot(diag = T, type = "lower", method = "color", addCoef.col = "black",
+                     tl.cex=0.9, 
+                     title = "Correlations of Japanese Monthly FF-Factors 1990 - 2021",
+                     mar = c(2, 0, 1, 0))
+```
+
+## Asia Pacific ex Japan Fama French Factors
+
+```{r}
+df <- asiapacific_5_mom %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(from, " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
+  filter(n() > 8*12) %>% 
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
+
+df_cor <- df %>% 
+  ungroup() %>% 
+  select(date, series, r) %>% 
+  pivot_wider(names_from = series, values_from = r) %>% 
+  select(-date) %>%
+  select(`_Mkt-RF`, everything()) %>% 
+  filter(!is.na(WML)) %>% 
+  cor()
+
+df_cor %>% 
+  corrplot::corrplot(diag = T, type = "lower", method = "color", addCoef.col = "black",
+                     tl.cex=0.9, 
+                     title = "Correlations of Asia Pacific exJap Monthly FF-Factors 1990 - 2021",
+                     mar = c(2, 0, 1, 0))
+```
+
+## Emerging Markets Fama French Factors
+
+```{r}
+df <- emerging_5_mom %>% 
+  group_by(decade = floor_date(date, "10 years"), series) %>% 
+  mutate(from = min(date), to = max(date),
+         p = cumprod(1+r)-1,
+         from_to = paste0(from, " - ", to),
+         dec = paste0(format(from, "%Y"), "s")) %>% 
+  filter(n() > 8*12) %>% 
+  mutate(series = ifelse(series == "Mkt-RF", "_Mkt-RF", series)) %>% 
+  filter(series != "RF")
+
+df_cor <- df %>% 
+  ungroup() %>% 
+  select(date, series, r) %>% 
+  pivot_wider(names_from = series, values_from = r) %>% 
+  select(-date) %>%
+  select(`_Mkt-RF`, everything()) %>% 
+  filter(!is.na(WML), !is.na(CMA)) %>% 
+  cor()
+
+df_cor %>% 
+  corrplot::corrplot(diag = T, type = "lower", method = "color", addCoef.col = "black",
+                     tl.cex=0.9, 
+                     title = "Correlations of Asia Pacific exJap Monthly FF-Factors 1990 - 2021",
+                     mar = c(2, 0, 1, 0))
+```
+

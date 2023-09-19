@@ -1,0 +1,87 @@
+---
+title: "Which Capture Ratios in Which Industris"
+author: "Martin Geissmann"
+date: "`r Sys.setlocale('LC_TIME', 'en_US.UTF-8'); format(Sys.Date(), '%d %b %Y')`"
+output: 
+  pdf_document:
+    number_sections: true
+# abstract: ""
+---
+
+```{r}
+library(tidyverse)
+library(tidyquant)
+library(scales)
+library(lubridate)
+library(ggrepel)
+```
+
+```{r}
+div_100 <- function(x) { x/100 }
+
+industries <- read_csv("data/48_Industry_Portfolios.CSV", skip = 11)
+industries <- read_csv("data/48_Industry_Portfolios.CSV", skip = 11, n_max = min(which(is.na(industries$X1)))-1, na = "-99.99") %>% 
+  rename(date = X1) %>% 
+  mutate(date = ymd(paste0(date, "01"))) %>% 
+  mutate_if(is.numeric, div_100)
+
+mkt <- read_csv("data/F-F_Research_Data_Factors.CSV", skip = 3)
+mkt <- read_csv("data/F-F_Research_Data_Factors.CSV", skip = 3, n_max = min(which(is.na(mkt$X1)))-1, na = "-99.99") %>% 
+  rename(date = X1) %>% 
+  mutate(date = ymd(paste0(date, "01"))) %>% 
+  mutate_if(is.numeric, div_100) %>% 
+  transmute(date, Mkt = `Mkt-RF`+RF)
+```
+
+```{r}
+industries %>% 
+  pivot_longer(-date) %>% 
+  filter(!is.na(value)) %>% 
+  arrange(name, date) %>% 
+  group_by(name) %>% 
+  summarise(md = min(date)) %>% 
+  arrange(md)
+
+industies_long <- industries %>% 
+  filter(date >= as.Date("1969-07-01")) %>% 
+  pivot_longer(-date, values_to = "r") %>% 
+  left_join(mkt, by = "date")
+```
+
+```{r}
+industies_long %>% 
+  group_by(name) %>%
+  filter(!is.na(Mkt),
+         !is.na(r)) %>% 
+  tq_performance(performance_fun = UpDownRatios, Ra = r, Rb = Mkt, method = "Capture") %>% 
+  arrange(UpCapture) %>% 
+  ggplot(aes(x = UpCapture, y = DownCapture, color = UpCapture > DownCapture)) +
+  geom_point() +
+  geom_text_repel(aes(label = name)) +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_hline(yintercept = 1) +
+  geom_vline(xintercept = 1) +
+  scale_x_continuous(limits = c(0.6,1.6)) +
+  scale_y_continuous(limits = c(0.6,1.6)) +
+  theme_classic()
+```
+
+```{r}
+beta <- func
+
+industies_long %>% 
+  group_by(name) %>% 
+  summarise(beta)
+```
+
+
+
+
+
+
+
+
+
+
+
+
