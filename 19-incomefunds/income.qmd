@@ -1,0 +1,350 @@
+---
+title: "Income Funds"
+format: html
+---
+
+## Intro
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(tidyquant)
+```
+
+```{r}
+qyld <- tq_get("QYLD")
+qyld_div <- tq_get("QYLD", get = "dividends")
+
+qyld |> 
+  ggplot(aes(x = date, y = close)) +
+  geom_line() +
+  geom_col(data = qyld_div, aes(x = date, y = value*50, fill = "dividend")) +
+  scale_y_continuous(name = "close", sec.axis = sec_axis(trans = ~ .x/50, name = "dividend")) +
+  labs(x = NULL, y = NULL, color = NULL, fill = NULL) +
+  theme_minimal()
+```
+
+Income funds may be composed of high dividend paying stocks, high coupon bonds, or they may be applying an alternative strategy using derivatives. The latter mostly means selling options to earn a premium.
+
+While high payouts are attractive, there is more to consider when making an investment.
+
+* TR
+* Risk
+    * SD
+    * Behavior under different market conditions
+    * Return distribution (tail-risk?)
+    
+## Data
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(tidyquant)
+library(jsonlite)
+
+ggplot2::theme_set(theme_minimal())
+```
+
+```{r}
+#| eval: false
+
+# https://site.financialmodelingprep.com/developer/docs/pricing/
+key <- str_remove(read_file(".key"), "\n$")
+
+# symbols list
+symbols <- read_json(paste0("https://financialmodelingprep.com/api/v3/stock/list?apikey=", key), simplifyVector = T) |> 
+  as_tibble()
+
+symbols_funds <- symbols |> 
+  filter(type %in% c("etf", "fund", "trust"),
+         exchangeShortName %in% c("NASDAQ", "AMEX", "NYSE", "BATS", "ETF")) |> 
+  distinct(symbol, name, type)
+
+symbols_funds |> saveRDS("data/symbols_funds.RDS")
+```
+
+```{r}
+#| eval: false
+# monthly
+eom <- seq(from = as.Date("2010-01-01"), to = Sys.Date(), by = "month")-1
+prices_m <- tibble()
+
+for (i in 1:length(eom)) {
+  d <- eom[i]
+  done <- F
+  while (!done) {
+    url <- paste0("https://financialmodelingprep.com/api/v4/batch-request-end-of-day-prices?date=", d, "&apikey=", key)
+    suppressMessages(
+      out <- read_csv(url, progress = F)
+    )
+    if ("SPY" %in% out$symbol) {
+      prices_m <- bind_rows(prices_m, out |> filter(symbol %in% symbols_funds$symbol))
+      cat(cat(format(d, "%Y-%m-%d")), "done\n")
+      done <- T
+    } else {
+      d <- d - 1
+    }
+  }
+}
+
+prices_m |> saveRDS("data/prices_m.RDS")
+```
+
+```{r}
+#| include: false
+prices_m <- readRDS("data/prices_m.RDS")
+symbols_funds <- readRDS("data/symbols_funds.RDS")
+```
+
+## Performance
+
+```{r}
+prices_m_ret <- prices_m |> 
+  arrange(symbol, date) |> 
+  group_by(symbol) |> 
+  transmute(symbol, date, 
+            r_close = close/lag(close)-1,
+            r_adj = adjClose/lag(adjClose)-1,
+            r_div = (1+r_adj)/(1+r_close)-1) |> 
+  ungroup() |> 
+  drop_na()
+```
+
+### QQQ and QYLD
+
+```{r}
+p <- prices_m_ret |> 
+  filter(symbol %in% c("QYLD", "QQQ")) |> 
+  group_by(symbol)
+  
+min_date <- p |> 
+  summarise(date = min(date)) |> 
+  summarise(date = max(date)) |> 
+  pull(date)
+
+p |> 
+  filter(date >= min_date) |> 
+  summarise(from = min(date),
+            to = max(date),
+            r_close_a = prod(1+r_close)^(12/n())-1,
+            r_adj_a = prod(1+r_adj)^(12/n())-1,
+            r_div_a = prod(1+r_div)^(12/n())-1,
+            sd_close_a = sd(r_close)*sqrt(12),
+            sd_adj_a = sd(r_adj)*sqrt(12),
+            `SR(rf=0)` = (r_adj_a/sd_adj_a) |> number(accuracy = 0.01)) |> 
+  mutate_if(is.numeric, percent, accuracy = 0.1) |> 
+  knitr::kable()
+```
+
+```{r}
+p |> 
+  filter(date >= min_date) |> 
+  select(symbol, date, r_adj) |> 
+  pivot_wider(names_from = symbol, values_from = r_adj) |> 
+  ggplot(aes(x = QQQ, y = QYLD)) +
+  geom_point(alpha = 0.5) +
+  # geom_smooth(se = F, color = "red", size = 0.5) +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent)
+```
+
+```{r}
+p |> 
+  filter(date >= min_date) |> 
+  group_by(symbol) |> 
+  mutate(dd = familyoffice::calc_drawdown(r_adj)) |> 
+  ggplot(aes(x = date, y = dd, color = symbol)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) +
+  labs(x = NULL, y = "drawdown", color = NULL, fill = NULL)
+```
+
+### SPY and XYLD
+
+```{r}
+p <- prices_m_ret |> 
+  filter(symbol %in% c("XYLD", "SPY")) |> 
+  group_by(symbol)
+  
+min_date <- p |> 
+  summarise(date = min(date)) |> 
+  summarise(date = max(date)) |> 
+  pull(date)
+
+p |> 
+  filter(date >= min_date) |> 
+  summarise(from = min(date),
+            to = max(date),
+            r_close_a = prod(1+r_close)^(12/n())-1,
+            r_adj_a = prod(1+r_adj)^(12/n())-1,
+            r_div_a = prod(1+r_div)^(12/n())-1,
+            sd_close_a = sd(r_close)*sqrt(12),
+            sd_adj_a = sd(r_adj)*sqrt(12),
+            `SR(rf=0)` = (r_adj_a/sd_adj_a) |> number(accuracy = 0.01)) |> 
+  mutate_if(is.numeric, percent, accuracy = 0.1) |> 
+  knitr::kable()
+```
+
+```{r}
+p |> 
+  filter(date >= min_date) |> 
+  group_by(symbol) |> 
+  mutate(p_close = cumprod(1+r_close)*100,
+         p_adj = cumprod(1+r_adj)*100) |> 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = p_close, color = "close")) +
+  geom_line(aes(y = p_adj, color = "adjusted")) +
+  labs(x = NULL, y = NULL, color = NULL, fill = NULL) +
+  facet_wrap(~symbol, ncol = 1)
+```
+
+```{r}
+p |> 
+  filter(date >= min_date) |> 
+  select(symbol, date, r_adj) |> 
+  pivot_wider(names_from = symbol, values_from = r_adj) |> 
+  ggplot(aes(x = SPY, y = XYLD)) +
+  geom_point(alpha = 0.5) +
+  # geom_smooth(se = F, color = "red", size = 0.5) +
+  geom_abline(slope = 1, intercept = 0, color = "blue") +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent)
+```
+
+### SPY and JEPI
+
+```{r}
+p <- prices_m_ret |> 
+  filter(symbol %in% c("JEPI", "SPY")) |> 
+  group_by(symbol)
+  
+min_date <- p |> 
+  summarise(date = min(date)) |> 
+  summarise(date = max(date)) |> 
+  pull(date)
+
+p |> 
+  filter(date >= min_date) |> 
+  summarise(from = min(date),
+            to = max(date),
+            r_close_a = prod(1+r_close)^(12/n())-1,
+            r_adj_a = prod(1+r_adj)^(12/n())-1,
+            sd_close_a = sd(r_close)*sqrt(12),
+            sd_adj_a = sd(r_adj)*sqrt(12),
+            `SR(rf=0)` = (r_adj_a/sd_adj_a) |> number(accuracy = 0.01)) |> 
+  mutate_if(is.numeric, percent, accuracy = 0.1) |> 
+  knitr::kable()
+```
+
+```{r}
+p |> 
+  filter(date >= min_date) |> 
+  group_by(symbol) |> 
+  mutate(p_close = cumprod(1+r_close)*100,
+         p_adj = cumprod(1+r_adj)*100) |> 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = p_close, color = "close")) +
+  geom_line(aes(y = p_adj, color = "adjusted")) +
+  labs(x = NULL, y = NULL, color = NULL, fill = NULL) +
+  facet_wrap(~symbol, ncol = 1)
+```
+
+### DIA and VYM
+
+```{r}
+p <- prices_m_ret |> 
+  filter(symbol %in% c("VYM", "SPY")) |> 
+  group_by(symbol)
+  
+min_date <- p |> 
+  summarise(date = min(date)) |> 
+  summarise(date = max(date)) |> 
+  pull(date)
+
+p |> 
+  filter(date >= min_date) |> 
+  summarise(from = min(date),
+            to = max(date),
+            r_close_a = prod(1+r_close)^(12/n())-1,
+            r_adj_a = prod(1+r_adj)^(12/n())-1,
+            sd_close_a = sd(r_close)*sqrt(12),
+            sd_adj_a = sd(r_adj)*sqrt(12),
+            `SR(rf=0)` = (r_adj_a/sd_adj_a) |> number(accuracy = 0.01)) |> 
+  mutate_if(is.numeric, percent, accuracy = 0.1) |> 
+  knitr::kable()
+```
+
+```{r}
+p |> 
+  filter(date >= min_date) |> 
+  group_by(symbol) |> 
+  mutate(p_close = cumprod(1+r_close)*100,
+         p_adj = cumprod(1+r_adj)*100) |> 
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = p_close, color = "close")) +
+  geom_line(aes(y = p_adj, color = "adjusted")) +
+  labs(x = NULL, y = NULL, color = NULL, fill = NULL) +
+  facet_wrap(~symbol, ncol = 1)
+```
+
+## Overview
+
+```{r}
+plt1 <- prices_m_ret |> 
+  group_by(symbol) |> 
+  filter(date >= as.Date("2015-01-01"),
+         n() > 103) |>  
+  summarise(r_close = prod(1+r_close)^(12/n())-1,
+            r_adj = prod(1+r_adj)^(12/n())-1,
+            r_div = prod(1+r_div)^(12/n())-1) |> 
+  filter(r_div > 0) |>
+  left_join(symbols_funds,
+            by = "symbol") |> 
+  filter(type == "etf") |> 
+  # mutate(name = str_replace(name, "&AMP;", "")) |> 
+  ggplot(aes(x = r_close, y = r_div, text = paste0(symbol, "<br>", name))) +
+  geom_point(size = 0.1) +
+  geom_point(size = 0.4, color = "red", 
+             aes(y = ifelse(symbol %in% c("QYLD", "XYLD", "QQQ", "SPY", "TLT", "SPUU", "GOEX"), r_div, NA_real_))) +
+  ggrepel::geom_label_repel(aes(label = ifelse(symbol %in% c("QYLD", "XYLD", "QQQ", "SPY", "TLT", "SPUU", "GOEX"), symbol, NA_character_)), 
+                  color = "red", size = 2) +
+  labs(x = "return close price (annualized)", y = "dividend yield (annualized)", 
+       color = NULL, fill = NULL, title = NULL) +
+  scale_x_continuous(labels = percent, breaks = -100:100/10, limits = c(-0.5, 0.5)) +
+  scale_y_continuous(labels = percent, breaks = -100:100/10, limits = c(-0.02, 0.3))
+
+plotly::ggplotly(plt1, tooltip = "text")
+```
+
+```{r}
+plt2 <- prices_m_ret |> 
+  group_by(symbol) |> 
+  filter(date >= as.Date("2015-01-01"),
+         n() > 103) |>  
+  summarise(r_close = prod(1+r_close)^(12/n())-1,
+            r_adj = prod(1+r_adj)^(12/n())-1,
+            r_div = prod(1+r_div)^(12/n())-1) |> 
+  filter(r_div > 0) |>
+  left_join(symbols_funds,
+            by = "symbol") |> 
+  filter(type == "etf") |> 
+  # mutate(name = str_replace(name, "&AMP;", "")) |> 
+  ggplot(aes(x = r_adj, y = r_div, text = paste0(symbol, "<br>", name))) +
+  geom_point(size = 0.1, color = "blue") +
+  geom_point(size = 0.4, color = "red", 
+             aes(y = ifelse(symbol %in% c("QYLD", "XYLD", "QQQ", "SPY", "TLT", "SPUU", "GOEX"), r_div, NA_real_))) +
+  ggrepel::geom_label_repel(aes(label = ifelse(symbol %in% c("QYLD", "XYLD", "QQQ", "SPY", "TLT", "SPUU", "GOEX"), symbol, NA_character_)), 
+                  color = "red", size = 2) +
+  labs(x = "return adjusted price (annualized)", y = "dividend yield (annualized)", 
+       color = NULL, fill = NULL, title = NULL) +
+  scale_x_continuous(labels = percent, breaks = -100:100/10, limits = c(-0.5, 0.5)) +
+  scale_y_continuous(labels = percent, breaks = -100:100/10, limits = c(-0.02, 0.3))
+
+plotly::ggplotly(plt2, tooltip = "text")
+```
+

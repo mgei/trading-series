@@ -9,3 +9,9 @@ Mini projects playing with financial data in R. Not investment advice.
 5. Relative Strength Rotation Strategy: Crude vs. Gold (https://youtu.be/ZEFKeAPsFXc)
 6. Leveraged ETFs: Is compounding decay really a thing?
 7. Leveraged ETFs: Short to harvest the performance lag?
+
+(...)
+
+19. Income funds and their value decay
+
+
